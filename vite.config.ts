@@ -1,6 +1,10 @@
 import { defineConfig } from 'vite'
 
 export default defineConfig({
+  assetsInclude: ['**/*.wasm'],
+  optimizeDeps: {
+    exclude: ['ktx2-encoder'],
+  },
   server: {
     proxy: {
       '/proxy/nominatim': {

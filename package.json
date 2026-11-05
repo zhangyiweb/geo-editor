@@ -9,11 +9,14 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@types/leaflet": "^1.9.22",
+    "@types/three": "^0.187.0",
     "typescript": "~7.0.2",
     "vite": "^8.3.6"
   },
   "dependencies": {
     "fflate": "^0.8.3",
+    "ktx2-encoder": "^0.6.0",
     "leaflet": "^1.9.4",
     "three": "^0.187.0"
   }

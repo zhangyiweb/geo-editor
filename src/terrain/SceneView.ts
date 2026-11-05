@@ -12,6 +12,9 @@ export class SceneView {
   private gridHelper: THREE.GridHelper
   private wireframeEnabled = false
   private gridVisible = true
+  private resizeObserver: ResizeObserver | null = null
+  private lastDrawW = 0
+  private lastDrawH = 0
 
   constructor(container: HTMLElement) {
     this.container = container
@@ -33,6 +36,8 @@ export class SceneView {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.shadowMap.enabled = true
     container.appendChild(this.renderer.domElement)
+    this.lastDrawW = w
+    this.lastDrawH = h
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true
@@ -53,6 +58,12 @@ export class SceneView {
     this.mountOverlay()
 
     window.addEventListener('resize', this.onResize)
+    this.resizeObserver = new ResizeObserver(() => this.resize())
+    this.resizeObserver.observe(this.container)
+    // 也观察父级（view-pane）尺寸变化：收起/展开/全屏
+    if (this.container.parentElement) {
+      this.resizeObserver.observe(this.container.parentElement)
+    }
     this.loop()
   }
 
@@ -140,12 +151,21 @@ export class SceneView {
   }
 
   resize(): void {
-    const w = this.container.clientWidth
-    const h = this.container.clientHeight
-    if (w === 0 || h === 0) return
+    const w = Math.round(this.container.clientWidth)
+    const h = Math.round(this.container.clientHeight)
+    // 收起成 40×40 时不要写入极低分辨率；并清空缓存，展开后强制重设
+    if (w < 64 || h < 64) {
+      this.lastDrawW = 0
+      this.lastDrawH = 0
+      return
+    }
+    if (w === this.lastDrawW && h === this.lastDrawH) return
+    this.lastDrawW = w
+    this.lastDrawH = h
     this.camera.aspect = w / h
     this.camera.updateProjectionMatrix()
-    this.renderer.setSize(w, h)
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    this.renderer.setSize(w, h, true)
   }
 
   private loop = (): void => {
@@ -227,6 +247,8 @@ export class SceneView {
   dispose(): void {
     cancelAnimationFrame(this.raf)
     window.removeEventListener('resize', this.onResize)
+    this.resizeObserver?.disconnect()
+    this.resizeObserver = null
     this.controls.dispose()
     this.renderer.dispose()
     this.renderer.domElement.remove()

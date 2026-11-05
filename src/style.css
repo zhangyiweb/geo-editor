@@ -180,8 +180,109 @@ input[type='range'] {
   margin-bottom: 8px;
 }
 
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .actions .row .btn {
   flex: 1;
+}
+
+.export-dialog {
+  border: none;
+  padding: 0;
+  background: transparent;
+  max-width: min(420px, calc(100vw - 32px));
+}
+
+.export-dialog::backdrop {
+  background: rgba(4, 12, 20, 0.62);
+  backdrop-filter: blur(3px);
+}
+
+.export-dialog-card {
+  margin: 0;
+  padding: 16px 16px 14px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #122033, #0d1824);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+  color: var(--text);
+}
+
+.export-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.export-dialog-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.export-dialog-close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.export-dialog-close:hover {
+  color: var(--text);
+  background: rgba(56, 189, 248, 0.22);
+}
+
+.export-dialog-hint {
+  margin: 0 0 12px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.export-dialog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.export-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  background: rgba(10, 21, 32, 0.9);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.export-option strong {
+  font-size: 0.88rem;
+  color: #7dd3fc;
+}
+
+.export-option span {
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.export-option:hover {
+  border-color: rgba(56, 189, 248, 0.55);
+  background: rgba(14, 165, 233, 0.12);
 }
 
 .seg {
@@ -723,13 +824,18 @@ input[type='range'] {
   border-color: rgba(56, 189, 248, 0.6);
 }
 
+.view-pane {
+  --view-chrome-top: 10px;
+  --view-chrome-size: 32px;
+}
+
+.view-fs-btn,
 .pip-toggle-btn {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: var(--view-chrome-top);
   z-index: 50;
-  width: 28px;
-  height: 28px;
+  width: var(--view-chrome-size);
+  height: var(--view-chrome-size);
   padding: 0;
   border: 1px solid rgba(56, 189, 248, 0.35);
   border-radius: 8px;
@@ -743,6 +849,92 @@ input[type='range'] {
   justify-content: center;
   backdrop-filter: blur(6px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
+  box-sizing: border-box;
+}
+
+.view-fs-btn {
+  right: 8px;
+}
+
+.view-pane.is-main .view-fs-btn {
+  top: var(--view-chrome-top);
+  right: 12px;
+}
+
+.view-pane.is-pip:not(.is-collapsed):not(.is-browser-fs) .view-fs-btn {
+  right: 40px;
+}
+
+.view-fs-icon {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+
+.view-fs-btn.is-exit .view-fs-icon {
+  width: 8px;
+  height: 8px;
+  border-width: 2px;
+}
+
+.view-fs-btn:hover {
+  border-color: rgba(56, 189, 248, 0.7);
+  color: var(--accent);
+  background: rgba(15, 28, 42, 0.95);
+}
+
+/* 铺满浏览器窗口（非整屏 API），Esc / 再点按钮退出 */
+.view-pane.is-browser-fs {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  z-index: 10000 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  cursor: default !important;
+  transition: none !important;
+}
+
+.view-pane.is-browser-fs .view-fs-btn,
+.view-pane.is-pip.is-browser-fs .view-fs-btn {
+  top: var(--view-chrome-top);
+  right: 12px;
+  width: var(--view-chrome-size);
+  height: var(--view-chrome-size);
+}
+
+.view-pane.is-browser-fs .pip-toggle-btn {
+  display: none !important;
+}
+
+.view-pane.is-browser-fs .pane-title {
+  max-width: calc(100% - 56px);
+}
+
+.view-pane.is-browser-fs .pane-title::after {
+  content: none;
+}
+
+.view-pane.is-browser-fs .view3d,
+.view-pane.is-browser-fs .view3d-host,
+.view-pane.is-browser-fs .view3d canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.pip-toggle-btn {
+  right: 8px;
 }
 
 .pip-toggle-btn:hover {
@@ -772,7 +964,8 @@ input[type='range'] {
 .view-pane.is-pip.is-collapsed .pane-title,
 .view-pane.is-pip.is-collapsed .view3d,
 .view-pane.is-pip.is-collapsed .view3d-toolbar,
-.view-pane.is-pip.is-collapsed .view3d-loading {
+.view-pane.is-pip.is-collapsed .view3d-loading,
+.view-pane.is-pip.is-collapsed .view-fs-btn {
   display: none !important;
 }
 
@@ -903,12 +1096,14 @@ input[type='range'] {
   flex-direction: row;
   align-items: center;
   gap: 8px;
-  padding: 5px 8px;
+  height: var(--view-chrome-size, 32px);
+  padding: 0 10px;
   border-radius: 10px;
   background: rgba(7, 16, 24, 0.88);
   border: 1px solid rgba(56, 189, 248, 0.35);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(8px);
+  box-sizing: border-box;
 }
 
 .view3d-switch {
@@ -917,12 +1112,14 @@ input[type='range'] {
   justify-content: space-between;
   gap: 6px;
   min-width: 0;
+  height: 100%;
   cursor: pointer;
   user-select: none;
 }
 
 .view3d-switch-label {
   font-size: 0.68rem;
+  line-height: 1;
   color: #c7d6e8;
   font-weight: 600;
 }
@@ -964,37 +1161,51 @@ input[type='range'] {
   transform: translateX(12px);
 }
 
-/* 全屏时避开右下角地图小窗 */
-.view-pane.is-main .view3d-toolbar {
-  top: 12px;
-  right: 12px;
+/* 主区域：与全屏按钮同一顶边、同一高度 */
+.view-pane.is-main:not(.is-browser-fs) .view3d-toolbar {
+  top: var(--view-chrome-top);
+  right: 52px;
   bottom: auto;
+  height: var(--view-chrome-size);
+  padding: 0 10px;
 }
 
-/* 小窗里进一步压缩，少挡模型 */
-.view-pane.is-pip .view3d-toolbar {
+/* 小窗里进一步压缩，少挡模型（全屏时不要用这套，否则会 top+bottom 把条拉成右侧竖条） */
+.view-pane.is-pip:not(.is-browser-fs) .view3d-toolbar {
+  top: auto;
   right: 8px;
   bottom: 8px;
+  height: auto;
+  min-height: 0;
   gap: 6px;
   padding: 4px 6px;
   border-radius: 8px;
 }
 
-.view-pane.is-pip .view3d-switch-label {
+.view-pane.is-browser-fs .view3d-toolbar {
+  top: var(--view-chrome-top);
+  right: 52px;
+  bottom: auto;
+  left: auto;
+  height: var(--view-chrome-size);
+  padding: 0 10px;
+}
+
+.view-pane.is-pip:not(.is-browser-fs) .view3d-switch-label {
   font-size: 0.62rem;
 }
 
-.view-pane.is-pip .view3d-switch-track {
+.view-pane.is-pip:not(.is-browser-fs) .view3d-switch-track {
   width: 24px;
   height: 14px;
 }
 
-.view-pane.is-pip .view3d-switch-thumb {
+.view-pane.is-pip:not(.is-browser-fs) .view3d-switch-thumb {
   width: 10px;
   height: 10px;
 }
 
-.view-pane.is-pip .view3d-switch.is-on .view3d-switch-thumb {
+.view-pane.is-pip:not(.is-browser-fs) .view3d-switch.is-on .view3d-switch-thumb {
   transform: translateX(10px);
 }
 

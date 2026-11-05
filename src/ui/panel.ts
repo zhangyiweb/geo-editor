@@ -23,10 +23,7 @@ export type PanelCallbacks = {
   onSearch: () => void
   onGenerate: () => void
   onRebuildTexture: () => void
-  onExportGlb: () => void
-  onExportObj: () => void
-  onExportStl: () => void
-  onExportTexture: () => void
+  onOpenExport: () => void
   onApplyArea: (areaKm2: number, mode: 'keep-ratio' | 'square') => void
   onChange: (values: PanelValues) => void
 }
@@ -40,6 +37,7 @@ export function mountPanel(
   setStatus: (text: string) => void
   setProgress: (done: number, total: number) => void
   setBusy: (busy: boolean) => void
+  setExportEnabled: (enabled: boolean) => void
   setTileEstimate: (html: string, level?: 'ok' | 'warn' | 'danger') => void
   setModeHelp: (mode: PanelValues['drawMode']) => void
   setMapViewPrecision: (zoom: number, latitude?: number) => void
@@ -158,14 +156,7 @@ export function mountPanel(
     <section class="panel-section actions">
       <button id="btn-generate" type="button" class="btn primary block">生成地形</button>
       <button id="btn-rebuild-tex" type="button" class="btn block">仅重建贴图</button>
-      <div class="row gap">
-        <button id="btn-glb" type="button" class="btn">导出 GLB</button>
-        <button id="btn-obj" type="button" class="btn">导出 OBJ+贴图</button>
-      </div>
-      <div class="row gap">
-        <button id="btn-stl" type="button" class="btn">导出 STL</button>
-        <button id="btn-png" type="button" class="btn">导出贴图 PNG</button>
-      </div>
+      <button id="btn-export" type="button" class="btn block" title="请先生成地形" disabled>导出</button>
     </section>
 
     <section class="panel-section">
@@ -216,6 +207,16 @@ export function mountPanel(
   let searchMode: SearchMode = initial.searchMode
   let drawMode: PanelValues['drawMode'] = initial.drawMode
   let shape: PanelValues['shape'] = initial.shape
+  let exportEnabled = false
+  let panelBusy = false
+
+  function syncExportButton() {
+    const btn = root.querySelector('#btn-export') as HTMLButtonElement | null
+    if (!btn) return
+    const enabled = exportEnabled && !panelBusy
+    btn.disabled = !enabled
+    btn.title = enabled ? '选择导出格式' : '请先生成地形'
+  }
 
   for (const p of IMAGERY_PROVIDERS) {
     const opt = document.createElement('option')
@@ -378,10 +379,7 @@ export function mountPanel(
   })
   $('btn-generate').addEventListener('click', () => callbacks.onGenerate())
   $('btn-rebuild-tex').addEventListener('click', () => callbacks.onRebuildTexture())
-  $('btn-glb').addEventListener('click', () => callbacks.onExportGlb())
-  $('btn-obj').addEventListener('click', () => callbacks.onExportObj())
-  $('btn-stl').addEventListener('click', () => callbacks.onExportStl())
-  $('btn-png').addEventListener('click', () => callbacks.onExportTexture())
+  $('btn-export').addEventListener('click', () => callbacks.onOpenExport())
   let areaMode: 'keep-ratio' | 'square' = 'keep-ratio'
   root.querySelectorAll('.area-mode-seg .seg-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -416,12 +414,19 @@ export function mountPanel(
       progressBar.style.width = `${pct}%`
     },
     setBusy(busy: boolean) {
+      panelBusy = busy
       root.classList.toggle('busy', busy)
       const keepEnabled = new Set(['btn-search', 'btn-goto-coords'])
       for (const btn of root.querySelectorAll('button')) {
         const el = btn as HTMLButtonElement
+        if (el.id === 'btn-export') continue
         el.disabled = busy && !keepEnabled.has(el.id)
       }
+      syncExportButton()
+    },
+    setExportEnabled(enabled: boolean) {
+      exportEnabled = enabled
+      syncExportButton()
     },
     setTileEstimate(_html: string, _level: 'ok' | 'warn' | 'danger' = 'ok') {
       // 瓦片预估已迁到地图左下角，由 App 更新

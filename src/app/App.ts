@@ -23,11 +23,9 @@ import {
 import { SceneView } from '../terrain/SceneView'
 import { buildTextureAtlas } from '../terrain/TextureAtlas'
 import { downloadArrayBuffer, exportGLB, formatBytes } from '../export/exportGLTF'
-import {
-  exportObjZip,
-  exportSTL,
-  exportTexturePng,
-} from '../export/exportZip'
+import { exportStamp } from '../export/filename'
+import { exportTerrainPack } from '../export/exportPack'
+import { exportSTL, exportTexturePng } from '../export/exportZip'
 import {
   mountPanel,
   renderSearchResults,
@@ -82,6 +80,9 @@ export class App {
           </div>
         </section>
         <section class="view-pane is-pip" id="view-pane" title="点击放大三维预览">
+          <button type="button" class="view-fs-btn" id="view-fs-btn" title="浏览器全屏查看" aria-label="浏览器全屏查看">
+            <span class="view-fs-icon" aria-hidden="true"></span>
+          </button>
           <button type="button" class="pip-toggle-btn" id="view-pip-toggle" title="收起三维预览" aria-label="收起三维预览">
             <span class="pip-toggle-icon" aria-hidden="true">›</span>
           </button>
@@ -89,6 +90,33 @@ export class App {
           <div id="view3d" class="view3d"></div>
         </section>
       </main>
+      <dialog class="export-dialog" id="export-dialog">
+        <form method="dialog" class="export-dialog-card">
+          <header class="export-dialog-header">
+            <h2>选择导出</h2>
+            <button type="submit" class="export-dialog-close" value="cancel" aria-label="关闭">×</button>
+          </header>
+          <p class="export-dialog-hint">请先生成地形后再导出</p>
+          <div class="export-dialog-list">
+            <button type="button" class="export-option" data-export="glb">
+              <strong>GLB 一体</strong>
+              <span>单文件 · 网格 + JPEG 贴图，浏览器预览方便</span>
+            </button>
+            <button type="button" class="export-option" data-export="pack">
+              <strong>GLB 几何 + KTX2 贴图包</strong>
+              <span>ZIP · 时间戳.glb（无贴图）+ .ktx2，适合 Three.js 分开加载</span>
+            </button>
+            <button type="button" class="export-option" data-export="stl">
+              <strong>STL 网格</strong>
+              <span>仅几何，无贴图，适合 3D 打印等</span>
+            </button>
+            <button type="button" class="export-option" data-export="tex">
+              <strong>仅贴图</strong>
+              <span>JPEG / PNG 漫反射贴图</span>
+            </button>
+          </div>
+        </form>
+      </dialog>
     `
 
     const sidebar = this.root.querySelector('#sidebar') as HTMLElement
@@ -101,13 +129,11 @@ export class App {
       onSearch: () => void this.handleSearch(),
       onGenerate: () => void this.handleGenerate(),
       onRebuildTexture: () => void this.handleRebuildTexture(),
-      onExportGlb: () => void this.handleExportGlb(),
-      onExportObj: () => void this.handleExportObj(),
-      onExportStl: () => this.handleExportStl(),
-      onExportTexture: () => void this.handleExportTexture(),
+      onOpenExport: () => this.openExportDialog(),
       onApplyArea: (areaKm2, mode) => this.handleApplyArea(areaKm2, mode),
       onChange: (v) => this.onPanelChange(v),
     })
+    this.bindExportDialog()
 
     this.map = new SelectionMap(mapEl, {
       onMainBBoxChange: (bbox) => {
@@ -148,20 +174,51 @@ export class App {
     const toggleBtn = workspace.querySelector(
       '#view-pip-toggle',
     ) as HTMLButtonElement
+    const fsBtn = workspace.querySelector('#view-fs-btn') as HTMLButtonElement
+
+    const syncFsBtn = () => {
+      const fs = viewPane.classList.contains('is-browser-fs')
+      const collapsed = viewPane.classList.contains('is-collapsed')
+      fsBtn.hidden = collapsed
+      fsBtn.classList.toggle('is-exit', fs)
+      fsBtn.title = fs ? '退出全屏' : '浏览器全屏查看'
+      fsBtn.setAttribute('aria-label', fs ? '退出全屏' : '浏览器全屏查看')
+    }
+
+    const setBrowserFullscreen = (on: boolean) => {
+      if (on && viewPane.classList.contains('is-collapsed')) {
+        viewPane.classList.remove('is-collapsed')
+        workspace.classList.remove('is-view-collapsed')
+      }
+      viewPane.classList.toggle('is-browser-fs', on)
+      document.body.classList.toggle('view-browser-fs', on)
+      syncFsBtn()
+      syncToggleBtn()
+      // 等布局生效后再改 WebGL 分辨率，避免小窗尺寸被拉伸发糊
+      requestAnimationFrame(() => {
+        this.view.resize()
+        requestAnimationFrame(() => this.view.resize())
+      })
+    }
 
     const syncToggleBtn = () => {
       const collapsed = viewPane.classList.contains('is-collapsed')
       const isPip = viewPane.classList.contains('is-pip')
-      toggleBtn.hidden = !isPip && !collapsed
+      const fs = viewPane.classList.contains('is-browser-fs')
+      toggleBtn.hidden = (!isPip && !collapsed) || fs
       toggleBtn.title = collapsed ? '展开三维预览' : '收起三维预览'
       toggleBtn.setAttribute(
         'aria-label',
         collapsed ? '展开三维预览' : '收起三维预览',
       )
       toggleBtn.classList.toggle('is-collapsed', collapsed)
+      syncFsBtn()
     }
 
     const setCollapsed = (collapsed: boolean) => {
+      if (collapsed && viewPane.classList.contains('is-browser-fs')) {
+        setBrowserFullscreen(false)
+      }
       viewPane.classList.toggle('is-collapsed', collapsed)
       workspace.classList.toggle('is-view-collapsed', collapsed)
       if (collapsed) {
@@ -199,6 +256,18 @@ export class App {
       setCollapsed(!collapsed)
     })
 
+    fsBtn.addEventListener('click', (ev) => {
+      ev.preventDefault()
+      ev.stopPropagation()
+      setBrowserFullscreen(!viewPane.classList.contains('is-browser-fs'))
+    })
+
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Escape') return
+      if (!viewPane.classList.contains('is-browser-fs')) return
+      setBrowserFullscreen(false)
+    })
+
     const bindPipClick = (pane: HTMLElement, swapTo: 'map' | 'view') => {
       let downX = 0
       let downY = 0
@@ -211,10 +280,12 @@ export class App {
       pane.addEventListener('pointerup', (ev) => {
         if (!pane.classList.contains('is-pip')) return
         if (pane.classList.contains('is-collapsed')) return
+        if (viewPane.classList.contains('is-browser-fs')) return
         const t = ev.target as HTMLElement
         if (t.closest('.view3d-toolbar')) return
         if (t.closest('.patch-delete-btn')) return
         if (t.closest('.pip-toggle-btn')) return
+        if (t.closest('.view-fs-btn')) return
         const dx = Math.abs(ev.clientX - downX)
         const dy = Math.abs(ev.clientY - downY)
         if (dx > 6 || dy > 6) return
@@ -231,6 +302,8 @@ export class App {
     requestAnimationFrame(() => {
       this.map.invalidateSize()
       this.view.resize()
+      // 再等一帧，确保收起→展开后的布局尺寸已落地
+      requestAnimationFrame(() => this.view.resize())
     })
   }
 
@@ -646,6 +719,7 @@ export class App {
     } finally {
       this.view.hideLoading()
       this.panel.setBusy(false)
+      this.panel.setExportEnabled(!!this.terrainMesh)
     }
   }
 
@@ -702,36 +776,74 @@ export class App {
     }
   }
 
+  private openExportDialog(): void {
+    const dialog = this.root.querySelector('#export-dialog') as HTMLDialogElement | null
+    dialog?.showModal()
+  }
+
+  private bindExportDialog(): void {
+    const dialog = this.root.querySelector('#export-dialog') as HTMLDialogElement
+    dialog.querySelectorAll<HTMLButtonElement>('[data-export]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const kind = btn.dataset.export
+        dialog.close()
+        if (kind === 'glb') void this.handleExportGlb()
+        else if (kind === 'pack') void this.handleExportPack()
+        else if (kind === 'stl') this.handleExportStl()
+        else if (kind === 'tex') void this.handleExportTexture()
+      })
+    })
+    dialog.addEventListener('click', (ev) => {
+      if (ev.target === dialog) dialog.close()
+    })
+  }
+
   private async handleExportGlb(): Promise<void> {
     if (!this.terrainMesh) {
       this.panel.setStatus('请先生成地形')
       return
     }
     try {
-      this.panel.setStatus('导出 GLB（压缩贴图中）…')
+      this.panel.setBusy(true)
+      this.panel.setStatus('导出 GLB一体（嵌入 JPEG 贴图）…')
       const buf = await exportGLB(this.terrainMesh)
-      downloadArrayBuffer(buf, 'terrain.glb')
-      this.panel.setStatus(`已下载 terrain.glb（${formatBytes(buf.byteLength)}）`)
+      const name = `${exportStamp()}.glb`
+      downloadArrayBuffer(buf, name)
+      this.panel.setStatus(`已下载 ${name}（${formatBytes(buf.byteLength)}）`)
     } catch (err) {
       this.panel.setStatus(
         err instanceof Error ? err.message : 'GLB 导出失败',
       )
+    } finally {
+      this.panel.setBusy(false)
     }
   }
 
-  private async handleExportObj(): Promise<void> {
+  private async handleExportPack(): Promise<void> {
     if (!this.terrainMesh) {
       this.panel.setStatus('请先生成地形')
       return
     }
     try {
-      this.panel.setStatus('打包 OBJ + 压缩贴图…')
-      const blob = await exportObjZip(this.terrainMesh, 'terrain')
-      this.panel.setStatus(`已下载 terrain_obj.zip（${formatBytes(blob.size)}）`)
+      this.panel.setBusy(true)
+      this.panel.setStatus('分包导出中（几何 GLB + KTX2）…')
+      const stamp = exportStamp()
+      const result = await exportTerrainPack(this.terrainMesh, stamp)
+      const texHint =
+        result.textureFormat === 'ktx2'
+          ? 'KTX2'
+          : result.textureFormat === 'none'
+            ? '无贴图'
+            : result.textureFormat.toUpperCase()
+      this.panel.setStatus(
+        `已下载 ${stamp}_pack.zip（${formatBytes(result.blob.size)} · 网格 ${formatBytes(result.geometryBytes)} · 贴图 ${texHint} ${formatBytes(result.textureBytes)}）`,
+      )
     } catch (err) {
       this.panel.setStatus(
-        err instanceof Error ? err.message : 'OBJ 导出失败',
+        err instanceof Error ? err.message : '分包导出失败',
       )
+    } finally {
+      this.panel.setBusy(false)
     }
   }
 
@@ -740,8 +852,9 @@ export class App {
       this.panel.setStatus('请先生成地形')
       return
     }
-    const blob = exportSTL(this.terrainMesh, 'terrain')
-    this.panel.setStatus(`已下载 terrain.stl（${formatBytes(blob.size)}）`)
+    const stamp = exportStamp()
+    const blob = exportSTL(this.terrainMesh, stamp)
+    this.panel.setStatus(`已下载 ${stamp}.stl（${formatBytes(blob.size)}）`)
   }
 
   private async handleExportTexture(): Promise<void> {
@@ -750,7 +863,8 @@ export class App {
       return
     }
     try {
-      const blob = await exportTexturePng(this.terrainMesh)
+      const stamp = exportStamp()
+      const blob = await exportTexturePng(this.terrainMesh, stamp)
       this.panel.setStatus(`已下载贴图（${formatBytes(blob.size)}）`)
     } catch (err) {
       this.panel.setStatus(
