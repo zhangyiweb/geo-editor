@@ -15,7 +15,7 @@ export type PanelValues = {
   verticalExaggeration: number
   maxEdge: number
   mapboxToken: string
-  drawMode: 'main' | 'patch' | 'none'
+  drawMode: 'main' | 'patch'
   shape: 'rect' | 'circle'
 }
 
@@ -90,7 +90,6 @@ export function mountPanel(
       <div class="seg">
         <button type="button" data-mode="main" class="seg-btn active">主区域</button>
         <button type="button" data-mode="patch" class="seg-btn">局部精度</button>
-        <button type="button" data-mode="none" class="seg-btn">仅浏览</button>
       </div>
       <label class="field-label mt">选区形状</label>
       <div class="seg shape-seg">
@@ -146,7 +145,6 @@ export function mountPanel(
           <input id="vert" type="range" min="0.5" max="5" step="0.1" />
           <span id="vert-val" class="val"></span>
         </div>
-        <p class="precision-badge muted span-2" id="dem-precision-badge"></p>
       </div>
 
       <div id="patch-precision-fields" class="precision-fields hidden">
@@ -154,11 +152,6 @@ export function mountPanel(
         <input id="patch-zoom" type="range" min="12" max="18" step="1" />
         <span id="patch-zoom-val" class="val"></span>
         <p class="precision-badge" id="patch-precision-badge"></p>
-      </div>
-
-      <div class="tile-estimate" id="tile-estimate">
-        <p class="tile-estimate-title">瓦片预估</p>
-        <p class="tile-estimate-body" id="tile-estimate-body">请先框选区域</p>
       </div>
     </section>
 
@@ -200,24 +193,18 @@ export function mountPanel(
   const mapboxToken = $<HTMLInputElement>('mapbox-token')
   const status = $<HTMLParagraphElement>('status')
   const progressBar = $<HTMLDivElement>('progress-bar')
-  const tileEstimate = $<HTMLDivElement>('tile-estimate')
-  const tileEstimateBody = $<HTMLParagraphElement>('tile-estimate-body')
   const mainPrecisionFields = $<HTMLDivElement>('main-precision-fields')
   const patchPrecisionFields = $<HTMLDivElement>('patch-precision-fields')
   const precisionSectionLabel = $<HTMLElement>('precision-section-label')
 
   function applyPrecisionPanel(mode: PanelValues['drawMode']) {
     const isPatch = mode === 'patch'
-    const isBrowse = mode === 'none'
     mainPrecisionFields.classList.toggle('hidden', isPatch)
     patchPrecisionFields.classList.toggle('hidden', !isPatch)
     precisionSectionLabel.textContent = isPatch ? '局部精度参数' : '主区域参数'
-    tileEstimate.dataset.context = isPatch ? 'patch' : 'main'
 
-    const areaTools = root.querySelector('#area-tools') as HTMLElement | null
     const areaLabel = root.querySelector('#area-label') as HTMLElement | null
     const squareBtn = root.querySelector('#area-square-btn') as HTMLElement | null
-    if (areaTools) areaTools.classList.toggle('hidden', isBrowse)
     if (areaLabel) {
       areaLabel.textContent = isPatch ? '局部精度面积' : '主区域面积'
     }
@@ -276,10 +263,8 @@ export function mountPanel(
     $('vert-val').textContent = Number(vert.value).toFixed(1)
 
     const tex = describePrecision(Number(texZoom.value), 'texture')
-    const dem = describePrecision(Number(demZoom.value), 'dem')
     const patch = describePrecision(Number(patchZoom.value), 'texture')
     $('tex-precision-badge').textContent = `当前整区贴图：${tex.detail}`
-    $('dem-precision-badge').textContent = `当前 DEM：${dem.detail}`
     $('patch-precision-badge').textContent = `当前局部贴图：${patch.detail}`
   }
 
@@ -438,9 +423,8 @@ export function mountPanel(
         el.disabled = busy && !keepEnabled.has(el.id)
       }
     },
-    setTileEstimate(html: string, level: 'ok' | 'warn' | 'danger' = 'ok') {
-      tileEstimateBody.innerHTML = html
-      tileEstimate.dataset.level = level
+    setTileEstimate(_html: string, _level: 'ok' | 'warn' | 'danger' = 'ok') {
+      // 瓦片预估已迁到地图左下角，由 App 更新
     },
     setModeHelp(mode: PanelValues['drawMode']) {
       applyPrecisionPanel(mode)

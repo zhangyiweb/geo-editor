@@ -72,9 +72,13 @@ export class App {
         <section class="map-pane is-main" id="map-pane">
           <div class="pane-title" id="map-pane-title">二维选区 · Shift+拖拽画框</div>
           <div id="map2d" class="map2d"></div>
-          <div class="map-hud" id="map-hud">
-            <div class="map-hud-primary" id="map-hud-primary">选区面积 —</div>
-            <div class="map-hud-secondary" id="map-hud-secondary">Shift + 拖拽框选 · 拖锚点调整</div>
+          <div class="map-stats" id="map-stats">
+            <div class="map-stats-line map-stats-tiles" id="map-stats-tiles">
+              瓦片预估：请先框选区域
+            </div>
+            <div class="map-stats-line map-stats-dem" id="map-stats-dem">
+              当前 DEM：—
+            </div>
           </div>
         </section>
         <section class="view-pane is-pip" id="view-pane" title="点击放大三维预览">
@@ -265,10 +269,8 @@ export class App {
     if (modeChanged && !shapeChanged) {
       if (v.drawMode === 'patch') {
         this.panel.setStatus('局部精度：Shift 新增多块，单击后可拖动调整')
-      } else if (v.drawMode === 'main') {
-        this.panel.setStatus('主区域：Shift 框选，拖锚点调整')
       } else {
-        this.panel.setStatus('仅浏览地图')
+        this.panel.setStatus('主区域：Shift 框选，拖锚点调整')
       }
     }
 
@@ -316,11 +318,6 @@ export class App {
     areaKm2: number,
     mode: 'keep-ratio' | 'square',
   ): void {
-    if (this.values.drawMode === 'none') {
-      this.panel.setStatus('请先切换到「主区域」或「局部精度」再设定面积')
-      return
-    }
-
     const modeLabel = mode === 'square'
       ? this.values.shape === 'circle'
         ? '正圆'
@@ -387,41 +384,57 @@ export class App {
   }
 
   private updateMapHud(zoom = this.map.getZoom(), centerLat = this.map.getCenterLat()): void {
-    const primary = this.root.querySelector('#map-hud-primary')
-    const secondary = this.root.querySelector('#map-hud-secondary')
     const mapTitle = this.root.querySelector('#map-pane-title')
+    const tilesEl = this.root.querySelector('#map-stats-tiles')
+    const demEl = this.root.querySelector('#map-stats-dem')
+    const statsEl = this.root.querySelector('#map-stats') as HTMLElement | null
     const z = Math.round(zoom)
-    const view = describePrecision(z, 'texture', centerLat)
     const shapeLabel = this.values.shape === 'circle' ? '圆形' : '矩形'
-    const modeTip =
-      this.values.drawMode === 'patch'
-        ? `局部精度 · ${shapeLabel} · Shift 新增多块，单击后可拖动`
-        : this.values.drawMode === 'main'
-          ? `主区域 · ${shapeLabel} · Shift 框选，拖锚点调整`
-          : '仅浏览 · 拖地图 / 滚轮缩放'
 
     if (mapTitle) {
-      mapTitle.textContent =
+      const modeTip =
         this.values.drawMode === 'patch'
-          ? `局部精度 · 视野 z${z}`
-          : this.values.drawMode === 'main'
-            ? `主区域 · 视野 z${z}`
-            : `仅浏览 · 视野 z${z}`
+          ? `局部精度 · ${shapeLabel} · Shift 新增多块`
+          : `主区域 · ${shapeLabel} · Shift 框选`
+      mapTitle.textContent = `${modeTip} · 视野 z${z}`
     }
 
-    if (primary) {
-      if (!this.mainBBox) {
-        primary.textContent = '选区面积 —'
-      } else {
-        const area = bboxAreaKm2(this.mainBBox)
-        const patches =
-          this.patches.length > 0 ? ` · 局部 ${this.patches.length} 块` : ''
-        primary.textContent = `选区面积 ${this.formatArea(area)} km²${patches}`
-      }
+    const dem = describePrecision(
+      this.values.demZoom,
+      'dem',
+      centerLat,
+    )
+    if (demEl) demEl.textContent = `当前 DEM：${dem.detail}`
+
+    if (!this.mainBBox) {
+      if (tilesEl) tilesEl.textContent = '瓦片预估：请先框选区域'
+      if (statsEl) statsEl.dataset.level = 'ok'
+      return
     }
 
-    if (secondary) {
-      secondary.textContent = `${modeTip} · 视野 z${z} ${view.label}（${view.level}）`
+    const demTiles = countTiles(this.mainBBox, this.values.demZoom)
+    const texTiles = countTiles(this.mainBBox, this.values.textureZoom)
+    const area = bboxAreaKm2(this.mainBBox)
+    let patchTiles = 0
+    for (const patch of this.patches) {
+      const clipped = bboxIntersect(this.mainBBox, patch.bbox)
+      if (!clipped) continue
+      patchTiles += countTiles(clipped, this.values.patchZoom)
+    }
+    const totalTex = texTiles + patchTiles
+    const level =
+      totalTex > 120 || demTiles > 80
+        ? 'danger'
+        : totalTex > 60 || demTiles > 40
+          ? 'warn'
+          : 'ok'
+    if (statsEl) statsEl.dataset.level = level
+
+    if (tilesEl) {
+      tilesEl.innerHTML =
+        this.values.drawMode === 'patch'
+          ? `瓦片预估：局部 <strong>${patchTiles || 0}</strong> · 整区 <strong>${texTiles}</strong> 张`
+          : `瓦片预估：DEM <strong>${demTiles}</strong> · 贴图 <strong>${texTiles}</strong> · 合计 <strong>${demTiles + totalTex}</strong> 张 · ${this.formatArea(area)} km² · z+1 ≈ ×4`
     }
   }
 
@@ -438,38 +451,6 @@ export class App {
     } else {
       this.panel.setCurrentArea(null, forceArea)
     }
-
-    if (!this.mainBBox) {
-      this.panel.setTileEstimate('请先框选区域', 'ok')
-      return
-    }
-    const demTiles = countTiles(this.mainBBox, this.values.demZoom)
-    const texTiles = countTiles(this.mainBBox, this.values.textureZoom)
-    const area = bboxAreaKm2(this.mainBBox)
-
-    let patchTiles = 0
-    for (const patch of this.patches) {
-      const clipped = bboxIntersect(this.mainBBox, patch.bbox)
-      if (!clipped) continue
-      patchTiles += countTiles(clipped, this.values.patchZoom)
-    }
-
-    const totalTex = texTiles + patchTiles
-    const level =
-      totalTex > 120 || demTiles > 80
-        ? 'danger'
-        : totalTex > 60 || demTiles > 40
-          ? 'warn'
-          : 'ok'
-
-    const focusingPatch = this.values.drawMode === 'patch'
-    this.panel.setTileEstimate(
-      focusingPatch
-        ? `<div>局部约 <strong>${patchTiles || 0}</strong> 张 · 整区约 <strong>${texTiles}</strong> 张</div>`
-        : `<div>DEM <strong>${demTiles}</strong> · 贴图 <strong>${texTiles}</strong> · 合计 <strong>${demTiles + totalTex}</strong> 张</div>
-           <div class="muted">${this.formatArea(area)} km² · z+1 ≈ 瓦片×4</div>`,
-      level,
-    )
   }
 
   private applySearchHit(

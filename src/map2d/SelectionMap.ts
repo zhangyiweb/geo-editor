@@ -10,7 +10,7 @@ export type SelectionMapCallbacks = {
   onSelectionChange?: () => void
 }
 
-type DrawMode = 'main' | 'patch' | 'none'
+type DrawMode = 'main' | 'patch'
 
 type HandleId =
   | 'nw'
@@ -608,7 +608,6 @@ export class SelectionMap {
 
   private onMouseDown = (e: L.LeafletMouseEvent): void => {
     if (this.editing) return
-    if (this.drawMode === 'none') return
     if (!e.originalEvent.shiftKey) {
       // 单击空白取消黄框选中
       if (this.drawMode === 'patch' && this.selectedPatchId) {
