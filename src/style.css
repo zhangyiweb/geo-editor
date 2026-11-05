@@ -805,9 +805,9 @@ input[type='range'] {
   pointer-events: none;
 }
 
-/* 地图为主时：避开左下缩放控件与右下 300 小窗 */
+/* 地图为主时：避开右下 300 小窗 */
 .workspace.is-map-main .map-pane.is-main .map-hud {
-  left: 58px;
+  left: 14px;
   right: 332px;
   transform: none;
   max-width: none;
@@ -1146,7 +1146,7 @@ input[type='range'] {
   }
 
   .workspace.is-map-main .map-pane.is-main .map-hud {
-    left: 52px;
+    left: 14px;
     right: 16px;
     bottom: 320px;
   }

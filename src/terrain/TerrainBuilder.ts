@@ -125,8 +125,51 @@ function clipGeometryToEllipse(
   }
 
   geo.setIndex(next)
+  compactIndexedGeometry(geo)
   geo.computeBoundingSphere()
   geo.computeBoundingBox()
+}
+
+/** Remove vertices not used by the index — no precision loss on kept verts. */
+function compactIndexedGeometry(geo: THREE.BufferGeometry): void {
+  const index = geo.getIndex()
+  if (!index || index.count === 0) return
+  const vertCount = geo.attributes.position?.count ?? 0
+  if (vertCount === 0) return
+
+  const used = new Int32Array(vertCount).fill(-1)
+  let nextId = 0
+  const newIndex = new Uint32Array(index.count)
+  for (let i = 0; i < index.count; i++) {
+    const old = index.getX(i)
+    let mapped = used[old]!
+    if (mapped < 0) {
+      mapped = nextId++
+      used[old] = mapped
+    }
+    newIndex[i] = mapped
+  }
+  if (nextId === vertCount) return
+
+  for (const name of Object.keys(geo.attributes)) {
+    const attr = geo.attributes[name] as THREE.BufferAttribute
+    const itemSize = attr.itemSize
+    const ArrayCtor = attr.array.constructor as new (length: number) => Float32Array
+    const dst = new ArrayCtor(nextId * itemSize)
+    const src = attr.array
+    for (let old = 0; old < vertCount; old++) {
+      const n = used[old]!
+      if (n < 0) continue
+      for (let k = 0; k < itemSize; k++) {
+        dst[n * itemSize + k] = src[old * itemSize + k]!
+      }
+    }
+    geo.setAttribute(
+      name,
+      new THREE.BufferAttribute(dst, itemSize, attr.normalized),
+    )
+  }
+  geo.setIndex(new THREE.BufferAttribute(newIndex, 1))
 }
 
 export function applyVerticalExaggeration(

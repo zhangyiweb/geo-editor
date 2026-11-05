@@ -14,7 +14,7 @@ export function exportOBJText(mesh: Mesh): string {
   return obj
 }
 
-export function exportMTLText(): string {
+export function exportMTLText(diffuseFile = 'terrain_diffuse.jpg'): string {
   return [
     'newmtl terrain',
     'Ka 1.000 1.000 1.000',
@@ -22,7 +22,7 @@ export function exportMTLText(): string {
     'Ks 0.050 0.050 0.050',
     'd 1.0',
     'illum 2',
-    'map_Kd terrain_diffuse.png',
+    `map_Kd ${diffuseFile}`,
     '',
   ].join('\n')
 }

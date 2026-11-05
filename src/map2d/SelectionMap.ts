@@ -83,7 +83,6 @@ export class SelectionMap {
       layers: [this.baseLayers.esri!],
       zoomControl: false,
     })
-    L.control.zoom({ position: 'bottomleft' }).addTo(this.map)
 
     L.control
       .layers(

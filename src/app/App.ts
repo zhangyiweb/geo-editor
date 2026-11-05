@@ -22,7 +22,7 @@ import {
 } from '../terrain/TerrainBuilder'
 import { SceneView } from '../terrain/SceneView'
 import { buildTextureAtlas } from '../terrain/TextureAtlas'
-import { downloadArrayBuffer, exportGLB } from '../export/exportGLTF'
+import { downloadArrayBuffer, exportGLB, formatBytes } from '../export/exportGLTF'
 import {
   exportObjZip,
   exportSTL,
@@ -727,10 +727,10 @@ export class App {
       return
     }
     try {
-      this.panel.setStatus('导出 GLB…')
+      this.panel.setStatus('导出 GLB（压缩贴图中）…')
       const buf = await exportGLB(this.terrainMesh)
       downloadArrayBuffer(buf, 'terrain.glb')
-      this.panel.setStatus('已下载 terrain.glb')
+      this.panel.setStatus(`已下载 terrain.glb（${formatBytes(buf.byteLength)}）`)
     } catch (err) {
       this.panel.setStatus(
         err instanceof Error ? err.message : 'GLB 导出失败',
@@ -744,9 +744,9 @@ export class App {
       return
     }
     try {
-      this.panel.setStatus('打包 OBJ + 贴图…')
-      await exportObjZip(this.terrainMesh, 'terrain')
-      this.panel.setStatus('已下载 terrain_obj.zip')
+      this.panel.setStatus('打包 OBJ + 压缩贴图…')
+      const blob = await exportObjZip(this.terrainMesh, 'terrain')
+      this.panel.setStatus(`已下载 terrain_obj.zip（${formatBytes(blob.size)}）`)
     } catch (err) {
       this.panel.setStatus(
         err instanceof Error ? err.message : 'OBJ 导出失败',
@@ -759,8 +759,8 @@ export class App {
       this.panel.setStatus('请先生成地形')
       return
     }
-    exportSTL(this.terrainMesh, 'terrain')
-    this.panel.setStatus('已下载 terrain.stl')
+    const blob = exportSTL(this.terrainMesh, 'terrain')
+    this.panel.setStatus(`已下载 terrain.stl（${formatBytes(blob.size)}）`)
   }
 
   private async handleExportTexture(): Promise<void> {
@@ -769,8 +769,8 @@ export class App {
       return
     }
     try {
-      await exportTexturePng(this.terrainMesh)
-      this.panel.setStatus('已下载贴图 PNG')
+      const blob = await exportTexturePng(this.terrainMesh)
+      this.panel.setStatus(`已下载贴图（${formatBytes(blob.size)}）`)
     } catch (err) {
       this.panel.setStatus(
         err instanceof Error ? err.message : '贴图导出失败',
