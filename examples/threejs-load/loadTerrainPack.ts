@@ -2,7 +2,7 @@
  * 数字孪生 / Three.js 工程侧加载示例（可复制到业务项目）。
  *
  * 依赖：three@0.187+
- * 配套文件：{stamp}.glb + {stamp}_diffuse.ktx2|jpg|png + {stamp}.meta.json
+ * 配套文件：terrain.glb + terrain_diffuse.ktx2|jpg|png + terrain.meta.json
  *
  * 顶点 Y 为真实海拔（米）× verticalExaggeration；原点在选区中心。
  */
@@ -47,7 +47,7 @@ export type LoadedTerrain = {
 export type LoadTerrainPackOptions = {
   /** 资源目录，如 './terrain/' 或 CDN 前缀 */
   baseUrl: string
-  /** 不含扩展名的时间戳名，如 20261106_093000 */
+  /** 不含扩展名的资源名，分包导出固定为 terrain */
   basename: string
   renderer: THREE.WebGLRenderer
   /** Basis transcoder 目录（KTX2 需要） */

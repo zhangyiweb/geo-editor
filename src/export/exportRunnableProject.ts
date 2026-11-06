@@ -121,6 +121,7 @@ export async function exportRunnableProject(
     geometryBytes: glbBytes.byteLength,
     textureBytes: 0,
     meta,
+    zipName: VIEWER_ZIP_NAME,
   }
 }
 

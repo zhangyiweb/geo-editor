@@ -137,7 +137,7 @@ export class App {
                 </button>
                 <button type="button" class="export-option" data-export="pack">
                   <strong>分包 ZIP</strong>
-                  <span>时间戳命名的 glb + ktx2 + meta，适合接入自有 Three.js 工程。</span>
+                  <span>ZIP 带时间戳；包内固定 terrain.glb + terrain_diffuse.ktx2 + meta。</span>
                 </button>
               </div>
               <div class="export-option-row">
@@ -908,7 +908,7 @@ export class App {
     }
     try {
       this.panel.setBusy(true)
-      this.panel.setStatus('分包导出中（几何 GLB + KTX2 + meta）…')
+      this.panel.setStatus('分包导出中（terrain.glb + 贴图 + meta）…')
       const stamp = exportStamp()
       const result = await exportTerrainPack(this.terrainMesh, stamp, ctx)
       const texHint =
@@ -918,7 +918,7 @@ export class App {
             ? '无贴图'
             : result.textureFormat.toUpperCase()
       this.panel.setStatus(
-        `已下载 ${stamp}_pack.zip（${formatBytes(result.blob.size)} · 网格 ${formatBytes(result.geometryBytes)} · 贴图 ${texHint} ${formatBytes(result.textureBytes)} · 含 meta）`,
+        `已下载 ${result.zipName}（${formatBytes(result.blob.size)} · 网格 ${formatBytes(result.geometryBytes)} · 贴图 ${texHint} ${formatBytes(result.textureBytes)}）`,
       )
     } catch (err) {
       this.panel.setStatus(

@@ -6,9 +6,11 @@
 
 | 文件 | 说明 |
 |------|------|
-| `{stamp}.glb` | 无贴图几何 |
-| `{stamp}_diffuse.ktx2`（或 jpg/png） | 漫反射贴图 |
-| `{stamp}.meta.json` | 坐标系 / 真实高程 / 范围 |
+| `terrain.glb` | 无贴图几何（包内固定名） |
+| `terrain_diffuse.ktx2`（或 jpg/png） | 漫反射贴图 |
+| `terrain.meta.json` | 坐标系 / 真实高程 / 范围 |
+
+ZIP 下载名带时间戳（如 `20261106_105300_pack.zip`），解压后文件名始终固定。
 
 ## 坐标系
 
@@ -23,7 +25,7 @@ import { loadTerrainPack, lngLatToLocal } from './loadTerrainPack'
 
 const { root, meta } = await loadTerrainPack({
   baseUrl: './terrain/',
-  basename: '20261106_093000',
+  basename: 'terrain',
   renderer,
 })
 scene.add(root)

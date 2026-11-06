@@ -13,7 +13,8 @@
 - **项目存档**：保存 / 打开 JSON（选区、局部精度、面板参数、地图视野）
 - **导出**（左侧面板「导出」弹窗）：
   - **可运行项目包**：ZIP（`index.html` + `assets/models/terrain.glb` 一体含贴图）
-  - **GLB 一体**、**GLB+KTX2 分包**、**STL**、**仅贴图 JPEG/PNG**
+  - **分包 ZIP**：下载名带时间戳；包内固定 `terrain.glb` + `terrain_diffuse.ktx2` + meta
+  - **GLB 一体**、**STL**、**仅贴图 JPEG/PNG**
 - **工程接入**：见 `examples/threejs-load/`（`loadTerrainPack` + 坐标系说明）
 
 ## 开发
