@@ -1,0 +1,15 @@
+---
+description: 提交代码后自动推送到远程
+alwaysApply: true
+---
+
+# Git 提交后自动推送
+
+用户要求：**提交代码后自动 push**，无需再询问是否推送。
+
+执行约定：
+
+1. 完成 `git commit` 且成功后，立即对当前分支执行 `git push`（若分支尚无上游，用 `git push -u origin HEAD`）。
+2. 若刚创建了本地分支/标签且用户意图是发布该版本，一并 `git push -u origin <branch>`。
+3. 推送失败时说明原因，不要强行 `--force`（除非用户明确要求）。
+4. 仅在用户明确说「只提交不推送」时跳过 push。
