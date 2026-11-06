@@ -27,6 +27,7 @@ npm run dev
 ```bash
 npm run build    # 类型检查 + 生产构建
 npm run preview  # 预览构建结果
+npm run test:e2e # Playwright 端到端自动化测试
 ```
 
 ## 使用提示
