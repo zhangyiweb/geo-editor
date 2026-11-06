@@ -345,6 +345,73 @@ input[type='range'] {
   }
 }
 
+.texture-studio-dialog {
+  border: none;
+  padding: 0;
+  background: transparent;
+  max-width: min(960px, calc(100vw - 24px));
+  width: min(960px, calc(100vw - 24px));
+}
+
+.texture-studio-dialog::backdrop {
+  background: rgba(4, 12, 20, 0.68);
+  backdrop-filter: blur(3px);
+}
+
+.texture-studio-card {
+  margin: 0;
+  padding: 16px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #122033, #0d1824);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+  color: var(--text);
+}
+
+.texture-studio-body {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 12px;
+  min-height: 420px;
+}
+
+.texture-studio-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.texture-studio-status {
+  margin: 4px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.texture-studio-view {
+  min-height: 420px;
+  border-radius: 12px;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  background: #070e18;
+  overflow: hidden;
+}
+
+.texture-studio-view canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+@media (max-width: 720px) {
+  .texture-studio-body {
+    grid-template-columns: 1fr;
+  }
+
+  .texture-studio-view {
+    min-height: 280px;
+  }
+}
+
 .seg {
   display: grid;
   grid-template-columns: 1fr 1fr;

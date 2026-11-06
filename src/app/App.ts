@@ -46,6 +46,10 @@ import {
   renderSearchResults,
   type PanelValues,
 } from '../ui/panel'
+import {
+  TextureStudio,
+  textureStudioDialogHtml,
+} from '../ui/textureStudio'
 
 export class App {
   private map!: SelectionMap
@@ -63,6 +67,7 @@ export class App {
   } | null = null
   private lastSearch: Awaited<ReturnType<typeof geocode>> = []
   private values: PanelValues
+  private textureStudio: TextureStudio | null = null
   private readonly root: HTMLElement
 
   constructor(root: HTMLElement) {
@@ -154,6 +159,7 @@ export class App {
           </div>
         </form>
       </dialog>
+      ${textureStudioDialogHtml()}
     `
 
     const sidebar = this.root.querySelector('#sidebar') as HTMLElement
@@ -167,12 +173,14 @@ export class App {
       onGenerate: () => void this.handleGenerate(),
       onRebuildTexture: () => void this.handleRebuildTexture(),
       onOpenExport: () => this.openExportDialog(),
+      onOpenTextureStudio: () => this.openTextureStudio(),
       onApplyArea: (areaKm2, mode) => this.handleApplyArea(areaKm2, mode),
       onSaveProject: () => this.handleSaveProject(),
       onLoadProject: (file) => void this.handleLoadProject(file),
       onChange: (v) => this.onPanelChange(v),
     })
     this.bindExportDialog()
+    this.bindTextureStudio()
 
     this.map = new SelectionMap(mapEl, {
       onMainBBoxChange: (bbox) => {
@@ -765,6 +773,7 @@ export class App {
       this.view.hideLoading()
       this.panel.setBusy(false)
       this.panel.setExportEnabled(!!this.terrainMesh)
+      this.panel.setTextureStudioEnabled(!!this.terrainMesh)
     }
   }
 
@@ -824,6 +833,31 @@ export class App {
   private openExportDialog(): void {
     const dialog = this.root.querySelector('#export-dialog') as HTMLDialogElement | null
     dialog?.showModal()
+  }
+
+  private bindTextureStudio(): void {
+    const dialog = this.root.querySelector(
+      '#texture-studio-dialog',
+    ) as HTMLDialogElement
+    dialog
+      .querySelector('#tex-studio-close')
+      ?.addEventListener('click', () => dialog.close())
+    this.textureStudio = new TextureStudio(dialog, {
+      onApplyToScene: (canvas) => {
+        if (!this.terrainMesh) return
+        applyTexture(this.terrainMesh, canvas)
+        this.panel.setStatus('贴图已应用到主场景')
+      },
+      onStatus: (text) => this.panel.setStatus(text),
+    })
+  }
+
+  private openTextureStudio(): void {
+    if (!this.terrainMesh) {
+      this.panel.setStatus('请先生成地形')
+      return
+    }
+    this.textureStudio?.open(this.terrainMesh)
   }
 
   private bindExportDialog(): void {
@@ -1009,6 +1043,7 @@ export class App {
       this.heightGrid = null
       this.lastBuilt = null
       this.panel.setExportEnabled(false)
+      this.panel.setTextureStudioEnabled(false)
       this.updateMeta(true)
       this.panel.setStatus(
         `已打开项目（${project.savedAt.slice(0, 19).replace('T', ' ')}），请重新生成地形`,

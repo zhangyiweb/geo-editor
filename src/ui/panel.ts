@@ -24,6 +24,7 @@ export type PanelCallbacks = {
   onGenerate: () => void
   onRebuildTexture: () => void
   onOpenExport: () => void
+  onOpenTextureStudio: () => void
   onApplyArea: (areaKm2: number, mode: 'keep-ratio' | 'square') => void
   onSaveProject: () => void
   onLoadProject: (file: File) => void
@@ -41,6 +42,7 @@ export function mountPanel(
   setProgress: (done: number, total: number) => void
   setBusy: (busy: boolean) => void
   setExportEnabled: (enabled: boolean) => void
+  setTextureStudioEnabled: (enabled: boolean) => void
   setTileEstimate: (html: string, level?: 'ok' | 'warn' | 'danger') => void
   setModeHelp: (mode: PanelValues['drawMode']) => void
   setMapViewPrecision: (zoom: number, latitude?: number) => void
@@ -160,6 +162,7 @@ export function mountPanel(
     <section class="panel-section actions">
       <button id="btn-generate" type="button" class="btn primary block">生成地形</button>
       <button id="btn-rebuild-tex" type="button" class="btn block">仅重建贴图</button>
+      <button id="btn-texture-studio" type="button" class="btn block" title="请先生成地形" disabled>贴图精修</button>
       <button id="btn-export" type="button" class="btn block" title="请先生成地形" disabled>导出</button>
       <div class="row project-row">
         <button id="btn-save-project" type="button" class="btn ghost" title="保存选区与参数为 JSON">保存项目</button>
@@ -217,6 +220,7 @@ export function mountPanel(
   let drawMode: PanelValues['drawMode'] = initial.drawMode
   let shape: PanelValues['shape'] = initial.shape
   let exportEnabled = false
+  let textureStudioEnabled = false
   let panelBusy = false
 
   function syncExportButton() {
@@ -225,6 +229,16 @@ export function mountPanel(
     const enabled = exportEnabled && !panelBusy
     btn.disabled = !enabled
     btn.title = enabled ? '选择导出格式' : '请先生成地形'
+  }
+
+  function syncTextureStudioButton() {
+    const btn = root.querySelector(
+      '#btn-texture-studio',
+    ) as HTMLButtonElement | null
+    if (!btn) return
+    const enabled = textureStudioEnabled && !panelBusy
+    btn.disabled = !enabled
+    btn.title = enabled ? '上传 PS 贴图预览 / 导出' : '请先生成地形'
   }
 
   for (const p of IMAGERY_PROVIDERS) {
@@ -392,6 +406,9 @@ export function mountPanel(
   })
   $('btn-generate').addEventListener('click', () => callbacks.onGenerate())
   $('btn-rebuild-tex').addEventListener('click', () => callbacks.onRebuildTexture())
+  $('btn-texture-studio').addEventListener('click', () =>
+    callbacks.onOpenTextureStudio(),
+  )
   $('btn-export').addEventListener('click', () => callbacks.onOpenExport())
   $('btn-save-project').addEventListener('click', () => callbacks.onSaveProject())
   const projectFile = $<HTMLInputElement>('project-file')
@@ -443,14 +460,19 @@ export function mountPanel(
       const keepEnabled = new Set(['btn-search', 'btn-goto-coords'])
       for (const btn of root.querySelectorAll('button')) {
         const el = btn as HTMLButtonElement
-        if (el.id === 'btn-export') continue
+        if (el.id === 'btn-export' || el.id === 'btn-texture-studio') continue
         el.disabled = busy && !keepEnabled.has(el.id)
       }
       syncExportButton()
+      syncTextureStudioButton()
     },
     setExportEnabled(enabled: boolean) {
       exportEnabled = enabled
       syncExportButton()
+    },
+    setTextureStudioEnabled(enabled: boolean) {
+      textureStudioEnabled = enabled
+      syncTextureStudioButton()
     },
     setTileEstimate(_html: string, _level: 'ok' | 'warn' | 'danger' = 'ok') {
       // 瓦片预估已迁到地图左下角，由 App 更新
