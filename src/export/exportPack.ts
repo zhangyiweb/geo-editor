@@ -1,32 +1,26 @@
 import { zipSync, strToU8 } from 'fflate'
 import type { Mesh } from 'three'
-import { downloadBlob, exportGeometryGLB } from './exportGLTF'
-import { getMeshDiffuseCanvas } from './exportOBJ'
-import { canvasToKtx2 } from './encodeKtx2'
-import { canvasToBlob } from '../terrain/TextureAtlas'
-import { EXPORT_JPEG_QUALITY, formatBytes } from './optimizeExport'
+import { downloadBlob } from './exportGLTF'
+import { formatBytes } from './optimizeExport'
+import {
+  buildTerrainAssets,
+  type TerrainPackContext,
+} from './buildTerrainAssets'
+import type { TerrainMeta } from '../sdk/terrainMeta'
 
-const LOAD_HINT = `Three.js 加载示例（几何 GLB + KTX2 贴图）
+export type { TerrainPackContext }
+
+const LOAD_HINT = `Three.js 加载示例（几何 GLB + KTX2 + meta）
 ========================================
-import * as THREE from 'three'
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
-import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js'
+详见仓库 examples/threejs-load/（可复制 loadTerrainPack.ts）。
+若需要开箱即用的预览页，请改用导出「可运行项目包」。
 
-const renderer = new THREE.WebGLRenderer()
-const ktx2 = new KTX2Loader()
-  .setTranscoderPath('https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/libs/basis/')
-  .detectSupport(renderer)
+要点：
+- {stamp}.meta.json 含原点经纬度、轴向、真实海拔范围
+- Y = 海拔米 × verticalExaggeration（绝对高程）
+- X=东，Y=上，Z=南
 
-const gltf = await new GLTFLoader().loadAsync('20261105_171530.glb')
-const mesh = gltf.scene.children[0]
-const map = await ktx2.loadAsync('20261105_171530_diffuse.ktx2')
-map.colorSpace = THREE.SRGBColorSpace
-mesh.material = new THREE.MeshStandardMaterial({ map, roughness: 0.95 })
-scene.add(gltf.scene)
-
-说明：KTX2（ETC1S）通常比同分辨率 JPG 更小，且 GPU 直传更快。
-文件名以导出时的本地时间戳为准（如 20261105_171530.glb）。
-若编码失败，包内会回退为 *_diffuse.jpg。
+KTX2（ETC1S）通常更小且 GPU 直传更快；失败时回退为 jpg/png。
 `
 
 export type TerrainPackResult = {
@@ -34,52 +28,25 @@ export type TerrainPackResult = {
   textureFormat: 'ktx2' | 'jpg' | 'png' | 'none'
   geometryBytes: number
   textureBytes: number
+  meta: TerrainMeta
 }
 
-/** 网格+贴图分包：{stamp}.glb（无贴图）+ {stamp}_diffuse.ktx2（失败则 jpg/png） */
+/** 网格+贴图分包：{stamp}.glb + 贴图 + {stamp}.meta.json */
 export async function exportTerrainPack(
   mesh: Mesh,
   basename: string,
+  ctx: TerrainPackContext,
 ): Promise<TerrainPackResult> {
-  const glb = await exportGeometryGLB(mesh)
-  const glbBytes = new Uint8Array(glb)
+  const assets = await buildTerrainAssets(mesh, basename, ctx)
 
   const files: Record<string, Uint8Array> = {
-    [`${basename}.glb`]: glbBytes,
+    [`${basename}.glb`]: assets.glbBytes,
+    [`${basename}.meta.json`]: strToU8(assets.metaJson),
     'README_加载说明.txt': strToU8(LOAD_HINT),
   }
 
-  let textureFormat: TerrainPackResult['textureFormat'] = 'none'
-  let textureBytes = 0
-  const canvas = getMeshDiffuseCanvas(mesh)
-
-  if (canvas) {
-    const needsAlpha = mesh.userData.shape === 'circle'
-    try {
-      if (needsAlpha) {
-        // KTX2 ETC1S 对透明圆边不够友好，圆形保留 PNG
-        const png = await canvasToBlob(canvas, 'image/png')
-        const bytes = new Uint8Array(await png.arrayBuffer())
-        files[`${basename}_diffuse.png`] = bytes
-        textureFormat = 'png'
-        textureBytes = bytes.byteLength
-      } else {
-        const ktx2 = await canvasToKtx2(canvas)
-        files[`${basename}_diffuse.ktx2`] = ktx2
-        textureFormat = 'ktx2'
-        textureBytes = ktx2.byteLength
-      }
-    } catch (err) {
-      console.warn('KTX2 encode failed, fallback to JPEG/PNG', err)
-      const blob = needsAlpha
-        ? await canvasToBlob(canvas, 'image/png')
-        : await canvasToBlob(canvas, 'image/jpeg', EXPORT_JPEG_QUALITY)
-      const bytes = new Uint8Array(await blob.arrayBuffer())
-      const ext = needsAlpha ? 'png' : 'jpg'
-      files[`${basename}_diffuse.${ext}`] = bytes
-      textureFormat = ext
-      textureBytes = bytes.byteLength
-    }
+  if (assets.diffuseBytes && assets.diffuseName) {
+    files[assets.diffuseName] = assets.diffuseBytes
   }
 
   const zipped = zipSync(files, { level: 6 })
@@ -87,9 +54,10 @@ export async function exportTerrainPack(
   downloadBlob(out, `${basename}_pack.zip`)
   return {
     blob: out,
-    textureFormat,
-    geometryBytes: glbBytes.byteLength,
-    textureBytes,
+    textureFormat: assets.textureFormat,
+    geometryBytes: assets.geometryBytes,
+    textureBytes: assets.textureBytes,
+    meta: assets.meta,
   }
 }
 

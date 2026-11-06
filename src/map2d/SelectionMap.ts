@@ -214,6 +214,24 @@ export class SelectionMap {
     this.callbacks.onPatchesChange([])
   }
 
+  /** 用存档中的局部精度区整体替换当前 patches */
+  setPatches(patches: TexturePatch[]): void {
+    this.clearPatches()
+    for (const src of patches) {
+      const patch: TexturePatch = {
+        id: src.id || `patch-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        bbox: normalizeBBox(src.bbox),
+        textureZoom: src.textureZoom || this.patchZoom,
+        shape: src.shape ?? 'rect',
+      }
+      this.patches.push(patch)
+      this.addPatchLayer(patch)
+    }
+    this.selectedPatchId = null
+    this.syncHandles()
+    this.callbacks.onPatchesChange([...this.patches])
+  }
+
   removeLastPatch(): void {
     const last = this.patches[this.patches.length - 1]
     if (!last) return

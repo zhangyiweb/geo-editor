@@ -23,6 +23,8 @@ export async function exportGLB(mesh: Mesh): Promise<ArrayBuffer> {
  */
 export async function exportGeometryGLB(mesh: Mesh): Promise<ArrayBuffer> {
   const geo = mesh.geometry.clone()
+  // 编辑器内部属性，勿写入 GLB
+  geo.deleteAttribute('elevation')
   compactIndexedGeometry(geo)
   const srcMat = mesh.material as MeshStandardMaterial
   const mat = new THREE.MeshStandardMaterial({
@@ -64,6 +66,14 @@ export function downloadBlob(blob: Blob, filename: string): void {
   a.download = filename
   a.click()
   URL.revokeObjectURL(url)
+}
+
+export function downloadText(
+  text: string,
+  filename: string,
+  mime = 'application/json',
+): void {
+  downloadBlob(new Blob([text], { type: `${mime};charset=utf-8` }), filename)
 }
 
 export { formatBytes }

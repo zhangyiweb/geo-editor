@@ -192,13 +192,20 @@ export class SceneView {
     const size = box.getSize(new THREE.Vector3())
     const center = box.getCenter(new THREE.Vector3())
     this.controls.target.copy(center)
-    const dist = Math.max(size.x, size.z) * 0.9
-    this.camera.position.set(center.x + dist * 0.4, dist * 0.65, center.z + dist * 0.7)
+    const span = Math.max(size.x, size.y, size.z)
+    const dist = Math.max(span * 0.9, 50)
+    this.camera.position.set(
+      center.x + dist * 0.4,
+      center.y + dist * 0.55,
+      center.z + dist * 0.7,
+    )
     this.camera.near = Math.max(0.1, dist / 1000)
-    this.camera.far = dist * 50
+    this.camera.far = Math.max(dist * 50, center.y + dist * 20)
     this.camera.updateProjectionMatrix()
     this.controls.update()
 
+    // 参考网格贴在地形最低海拔，避免真实高程时悬在 Y=0
+    this.gridHelper.position.set(center.x, box.min.y, center.z)
     this.gridHelper.scale.setScalar(Math.max(size.x, size.z) / 2000)
     this.setWireframe(this.wireframeEnabled)
   }

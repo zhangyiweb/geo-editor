@@ -25,6 +25,8 @@ export type PanelCallbacks = {
   onRebuildTexture: () => void
   onOpenExport: () => void
   onApplyArea: (areaKm2: number, mode: 'keep-ratio' | 'square') => void
+  onSaveProject: () => void
+  onLoadProject: (file: File) => void
   onChange: (values: PanelValues) => void
 }
 
@@ -34,6 +36,7 @@ export function mountPanel(
   callbacks: PanelCallbacks,
 ): {
   getValues: () => PanelValues
+  setValues: (values: PanelValues) => void
   setStatus: (text: string) => void
   setProgress: (done: number, total: number) => void
   setBusy: (busy: boolean) => void
@@ -139,10 +142,11 @@ export function mountPanel(
         </div>
         <p class="precision-badge span-2" id="tex-precision-badge"></p>
         <div class="span-2">
-          <label class="field-label">垂直夸张</label>
+          <label class="field-label">垂直夸张（真实海拔 ×）</label>
           <input id="vert" type="range" min="0.5" max="5" step="0.1" />
           <span id="vert-val" class="val"></span>
         </div>
+        <p class="hint span-2">顶点 Y 使用真实海拔（米）；夸张=1 即为原海拔。</p>
       </div>
 
       <div id="patch-precision-fields" class="precision-fields hidden">
@@ -157,6 +161,11 @@ export function mountPanel(
       <button id="btn-generate" type="button" class="btn primary block">生成地形</button>
       <button id="btn-rebuild-tex" type="button" class="btn block">仅重建贴图</button>
       <button id="btn-export" type="button" class="btn block" title="请先生成地形" disabled>导出</button>
+      <div class="row project-row">
+        <button id="btn-save-project" type="button" class="btn ghost" title="保存选区与参数为 JSON">保存项目</button>
+        <button id="btn-load-project" type="button" class="btn ghost" title="从 JSON 恢复选区与参数">打开项目</button>
+      </div>
+      <input id="project-file" type="file" accept="application/json,.json" hidden />
     </section>
 
     <section class="panel-section">
@@ -239,21 +248,25 @@ export function mountPanel(
     if (mode === 'coords') results.innerHTML = ''
   }
 
-  function applyInitial() {
-    query.value = initial.query
-    lat.value = initial.lat
-    lng.value = initial.lng
-    provider.value = initial.providerId
-    demZoom.value = String(initial.demZoom)
-    texZoom.value = String(initial.textureZoom)
-    patchZoom.value = String(initial.patchZoom)
-    maxEdge.value = String(initial.maxEdge)
-    vert.value = String(initial.verticalExaggeration)
-    mapboxToken.value = initial.mapboxToken
-    applySearchMode(initial.searchMode)
-    syncDrawModeButtons(initial.drawMode)
-    syncShapeButtons(initial.shape)
+  function applyValues(v: PanelValues) {
+    query.value = v.query
+    lat.value = v.lat
+    lng.value = v.lng
+    provider.value = v.providerId
+    demZoom.value = String(v.demZoom)
+    texZoom.value = String(v.textureZoom)
+    patchZoom.value = String(v.patchZoom)
+    maxEdge.value = String(v.maxEdge)
+    vert.value = String(v.verticalExaggeration)
+    mapboxToken.value = v.mapboxToken
+    applySearchMode(v.searchMode)
+    syncDrawModeButtons(v.drawMode)
+    syncShapeButtons(v.shape)
     syncLabels()
+  }
+
+  function applyInitial() {
+    applyValues(initial)
   }
 
   function syncLabels() {
@@ -380,6 +393,14 @@ export function mountPanel(
   $('btn-generate').addEventListener('click', () => callbacks.onGenerate())
   $('btn-rebuild-tex').addEventListener('click', () => callbacks.onRebuildTexture())
   $('btn-export').addEventListener('click', () => callbacks.onOpenExport())
+  $('btn-save-project').addEventListener('click', () => callbacks.onSaveProject())
+  const projectFile = $<HTMLInputElement>('project-file')
+  $('btn-load-project').addEventListener('click', () => projectFile.click())
+  projectFile.addEventListener('change', () => {
+    const file = projectFile.files?.[0]
+    projectFile.value = ''
+    if (file) callbacks.onLoadProject(file)
+  })
   let areaMode: 'keep-ratio' | 'square' = 'keep-ratio'
   root.querySelectorAll('.area-mode-seg .seg-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -406,6 +427,9 @@ export function mountPanel(
 
   return {
     getValues,
+    setValues(values: PanelValues) {
+      applyValues(values)
+    },
     setStatus(text: string) {
       status.textContent = text
     },

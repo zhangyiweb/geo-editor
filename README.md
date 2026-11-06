@@ -7,13 +7,14 @@
 - **定位**：地名搜索（Nominatim）或经纬度跳转
 - **选区**：矩形 / 圆形；主区域（蓝框）与局部精度区（黄框，可多块、拖拽调整、删除）
 - **面积设定**：按当前模式设定主区域或局部精度区面积（保持比例 / 正方形·正圆）
-- **DEM**：AWS Terrarium 高度网格，独立调节 DEM zoom、网格上限、垂直夸张
+- **DEM**：AWS Terrarium 高度网格；**真实海拔**（顶点 Y = 海拔米 × 垂直夸张）
 - **贴图**：Esri / USGS / Bing / OSM / Mapbox（可选 Token）；整区与局部 zoom 分开调节
 - **布局**：主屏为地图；右下角 300×300 三维小窗，点击放大对换；可一键收起
+- **项目存档**：保存 / 打开 JSON（选区、局部精度、面板参数、地图视野）
 - **导出**（左侧面板「导出」弹窗）：
-  - **GLB 一体**：单文件含网格 + JPEG 贴图
-  - **GLB 几何 + KTX2 贴图包**：ZIP（时间戳`.glb` 无贴图 + `.ktx2`），适合 Three.js 分开加载
-  - **STL 网格** / **仅贴图**
+  - **可运行项目包**：ZIP（`index.html` + `assets/models/terrain.glb` 一体含贴图）
+  - **GLB 一体**、**GLB+KTX2 分包**、**STL**、**仅贴图 JPEG/PNG**
+- **工程接入**：见 `examples/threejs-load/`（`loadTerrainPack` + 坐标系说明）
 
 ## 开发
 
@@ -27,7 +28,6 @@ npm run dev
 ```bash
 npm run build    # 类型检查 + 生产构建
 npm run preview  # 预览构建结果
-npm run test:e2e # Playwright 端到端自动化测试
 ```
 
 ## 使用提示

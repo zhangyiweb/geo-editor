@@ -16,6 +16,7 @@ export type TerrainMeshResult = {
 /**
  * Build a terrain mesh in local meters centered at origin.
  * X = east, Z = south (Three.js Y-up), so north is -Z.
+ * Y uses absolute elevation in meters × verticalExaggeration.
  */
 export function buildTerrainMesh(
   grid: HeightGrid,
@@ -39,15 +40,17 @@ export function buildTerrainMesh(
   geo.rotateX(-Math.PI / 2)
 
   const pos = geo.attributes.position as THREE.BufferAttribute
-  // 最低点贴齐水平网格面（Y=0），避免地形沉到网格下方
+  const elevAttr = new Float32Array(segX * segY)
+  // 真实海拔：Y = elev × 垂直夸张（夸张=1 即为海拔米）
   for (let j = 0; j < segY; j++) {
     for (let i = 0; i < segX; i++) {
       const elev = data[j * segX + i]!
       const idx = j * segX + i
-      const y = (elev - min) * verticalExaggeration
-      pos.setY(idx, y)
+      elevAttr[idx] = elev
+      pos.setY(idx, elev * verticalExaggeration)
     }
   }
+  geo.setAttribute('elevation', new THREE.BufferAttribute(elevAttr, 1))
 
   const uv = geo.attributes.uv as THREE.BufferAttribute
   for (let j = 0; j < segY; j++) {
@@ -78,6 +81,12 @@ export function buildTerrainMesh(
   mesh.castShadow = true
   mesh.receiveShadow = true
   mesh.userData.shape = shape
+  mesh.userData.elevationMode = 'absolute'
+  mesh.userData.minElev = min
+  mesh.userData.maxElev = max
+  mesh.userData.widthMeters = widthMeters
+  mesh.userData.depthMeters = heightMeters
+  mesh.userData.bbox = bbox
 
   return {
     mesh,
@@ -174,19 +183,16 @@ function compactIndexedGeometry(geo: THREE.BufferGeometry): void {
 
 export function applyVerticalExaggeration(
   mesh: THREE.Mesh,
-  grid: HeightGrid,
+  _grid: HeightGrid,
   verticalExaggeration: number,
 ): void {
   const geo = mesh.geometry as THREE.BufferGeometry
   const pos = geo.attributes.position as THREE.BufferAttribute
-  const { width: segX, height: segY, data, min } = grid
+  const elevAttr = geo.getAttribute('elevation') as THREE.BufferAttribute | null
+  if (!elevAttr) return
 
-  for (let j = 0; j < segY; j++) {
-    for (let i = 0; i < segX; i++) {
-      const elev = data[j * segX + i]!
-      const idx = j * segX + i
-      pos.setY(idx, (elev - min) * verticalExaggeration)
-    }
+  for (let idx = 0; idx < pos.count; idx++) {
+    pos.setY(idx, elevAttr.getX(idx) * verticalExaggeration)
   }
   pos.needsUpdate = true
   geo.computeVertexNormals()

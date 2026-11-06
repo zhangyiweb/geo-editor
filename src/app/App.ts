@@ -22,10 +22,25 @@ import {
 } from '../terrain/TerrainBuilder'
 import { SceneView } from '../terrain/SceneView'
 import { buildTextureAtlas } from '../terrain/TextureAtlas'
-import { downloadArrayBuffer, exportGLB, formatBytes } from '../export/exportGLTF'
+import {
+  downloadArrayBuffer,
+  downloadText,
+  exportGLB,
+  formatBytes,
+} from '../export/exportGLTF'
 import { exportStamp } from '../export/filename'
 import { exportTerrainPack } from '../export/exportPack'
+import { exportRunnableProject } from '../export/exportRunnableProject'
 import { exportSTL, exportTexturePng } from '../export/exportZip'
+import {
+  buildTerrainMeta,
+  terrainMetaToJson,
+} from '../sdk/terrainMeta'
+import {
+  createProject,
+  parseProjectJson,
+  projectToJson,
+} from '../sdk/projectFile'
 import {
   mountPanel,
   renderSearchResults,
@@ -40,6 +55,12 @@ export class App {
   private patches: TexturePatch[] = []
   private heightGrid: HeightGrid | null = null
   private terrainMesh: Mesh | null = null
+  private lastBuilt: {
+    minElev: number
+    maxElev: number
+    widthMeters: number
+    depthMeters: number
+  } | null = null
   private lastSearch: Awaited<ReturnType<typeof geocode>> = []
   private values: PanelValues
   private readonly root: HTMLElement
@@ -55,7 +76,7 @@ export class App {
       demZoom: 12,
       textureZoom: 14,
       patchZoom: 16,
-      verticalExaggeration: 1.5,
+      verticalExaggeration: 1,
       maxEdge: 256,
       mapboxToken: getMapboxToken(),
       drawMode: 'main',
@@ -96,24 +117,40 @@ export class App {
             <h2>选择导出</h2>
             <button type="submit" class="export-dialog-close" value="cancel" aria-label="关闭">×</button>
           </header>
-          <p class="export-dialog-hint">请先生成地形后再导出</p>
+          <p class="export-dialog-hint">生成地形后再导出。</p>
           <div class="export-dialog-list">
-            <button type="button" class="export-option" data-export="glb">
-              <strong>GLB 一体</strong>
-              <span>单文件 · 网格 + JPEG 贴图，浏览器预览方便</span>
-            </button>
-            <button type="button" class="export-option" data-export="pack">
-              <strong>GLB 几何 + KTX2 贴图包</strong>
-              <span>ZIP · 时间戳.glb（无贴图）+ .ktx2，适合 Three.js 分开加载</span>
-            </button>
-            <button type="button" class="export-option" data-export="stl">
-              <strong>STL 网格</strong>
-              <span>仅几何，无贴图，适合 3D 打印等</span>
-            </button>
-            <button type="button" class="export-option" data-export="tex">
-              <strong>仅贴图</strong>
-              <span>JPEG / PNG 漫反射贴图</span>
-            </button>
+            <section class="export-group export-group-panel">
+              <h3 class="export-group-title">预览项目</h3>
+              <p class="export-group-desc">本地起服务即可查看；改地形后重新导出覆盖即可。</p>
+              <button type="button" class="export-option export-option-primary" data-export="viewer">
+                <strong>可运行项目包</strong>
+                <span>ZIP：index.html + assets/models/terrain.glb（网格与贴图已合成）。解压后执行 npx serve . 即可预览。</span>
+              </button>
+            </section>
+            <section class="export-group export-group-panel">
+              <h3 class="export-group-title">其它格式</h3>
+              <p class="export-group-desc">通用交换格式，文件名带时间戳。</p>
+              <div class="export-option-row">
+                <button type="button" class="export-option" data-export="glb">
+                  <strong>GLB 一体</strong>
+                  <span>单文件网格 + JPEG 贴图，附 meta.json，方便拖进查看器。</span>
+                </button>
+                <button type="button" class="export-option" data-export="pack">
+                  <strong>分包 ZIP</strong>
+                  <span>时间戳命名的 glb + ktx2 + meta，适合接入自有 Three.js 工程。</span>
+                </button>
+              </div>
+              <div class="export-option-row">
+                <button type="button" class="export-option" data-export="stl">
+                  <strong>STL 网格</strong>
+                  <span>仅几何、无贴图，适合 3D 打印或 CAD 粗模。</span>
+                </button>
+                <button type="button" class="export-option" data-export="tex">
+                  <strong>JPEG / PNG</strong>
+                  <span>通用图片漫反射贴图，兼容性最好。</span>
+                </button>
+              </div>
+            </section>
           </div>
         </form>
       </dialog>
@@ -131,6 +168,8 @@ export class App {
       onRebuildTexture: () => void this.handleRebuildTexture(),
       onOpenExport: () => this.openExportDialog(),
       onApplyArea: (areaKm2, mode) => this.handleApplyArea(areaKm2, mode),
+      onSaveProject: () => this.handleSaveProject(),
+      onLoadProject: (file) => void this.handleLoadProject(file),
       onChange: (v) => this.onPanelChange(v),
     })
     this.bindExportDialog()
@@ -679,6 +718,12 @@ export class App {
         mainShape,
       )
       this.terrainMesh = built.mesh
+      this.lastBuilt = {
+        minElev: built.minElev,
+        maxElev: built.maxElev,
+        widthMeters: built.widthMeters,
+        depthMeters: built.heightMeters,
+      }
       // 先不上屏，等贴图完成再一起显示
       this.terrainMesh.visible = false
 
@@ -705,7 +750,7 @@ export class App {
       this.panel.setProgress(1, 1)
       this.view.setLoadingProgress(1, '完成')
       this.panel.setStatus(
-        `完成 · 高程 ${built.minElev.toFixed(0)}–${built.maxElev.toFixed(0)} m · ${samplesX}×${samplesY} 顶点`,
+        `完成 · 真实海拔 ${built.minElev.toFixed(0)}–${built.maxElev.toFixed(0)} m · ${samplesX}×${samplesY} 顶点`,
       )
       this.updateMeta()
       // 稍留完成态再揭开
@@ -789,6 +834,7 @@ export class App {
         dialog.close()
         if (kind === 'glb') void this.handleExportGlb()
         else if (kind === 'pack') void this.handleExportPack()
+        else if (kind === 'viewer') void this.handleExportViewer()
         else if (kind === 'stl') this.handleExportStl()
         else if (kind === 'tex') void this.handleExportTexture()
       })
@@ -798,18 +844,49 @@ export class App {
     })
   }
 
+  private getExportContext() {
+    const bbox = this.mainBBox ?? this.map.getMainBBox()
+    const built = this.lastBuilt
+    if (!this.terrainMesh || !bbox || !built) return null
+    return {
+      demZoom: this.values.demZoom,
+      textureZoom: this.values.textureZoom,
+      providerId: this.values.providerId,
+      verticalExaggeration: this.values.verticalExaggeration,
+      minElev: built.minElev,
+      maxElev: built.maxElev,
+      widthMeters: built.widthMeters,
+      depthMeters: built.depthMeters,
+      bbox,
+      shape: this.map.getMainShape(),
+    }
+  }
+
   private async handleExportGlb(): Promise<void> {
     if (!this.terrainMesh) {
       this.panel.setStatus('请先生成地形')
       return
     }
+    const ctx = this.getExportContext()
+    if (!ctx) {
+      this.panel.setStatus('缺少选区或高程信息，请重新生成')
+      return
+    }
     try {
       this.panel.setBusy(true)
       this.panel.setStatus('导出 GLB一体（嵌入 JPEG 贴图）…')
+      const stamp = exportStamp()
       const buf = await exportGLB(this.terrainMesh)
-      const name = `${exportStamp()}.glb`
-      downloadArrayBuffer(buf, name)
-      this.panel.setStatus(`已下载 ${name}（${formatBytes(buf.byteLength)}）`)
+      downloadArrayBuffer(buf, `${stamp}.glb`)
+      const meta = buildTerrainMeta({
+        ...ctx,
+        basename: stamp,
+        textureExt: 'jpg',
+      })
+      downloadText(terrainMetaToJson(meta), `${stamp}.meta.json`)
+      this.panel.setStatus(
+        `已下载 ${stamp}.glb + meta（${formatBytes(buf.byteLength)}）`,
+      )
     } catch (err) {
       this.panel.setStatus(
         err instanceof Error ? err.message : 'GLB 导出失败',
@@ -824,11 +901,16 @@ export class App {
       this.panel.setStatus('请先生成地形')
       return
     }
+    const ctx = this.getExportContext()
+    if (!ctx) {
+      this.panel.setStatus('缺少选区或高程信息，请重新生成')
+      return
+    }
     try {
       this.panel.setBusy(true)
-      this.panel.setStatus('分包导出中（几何 GLB + KTX2）…')
+      this.panel.setStatus('分包导出中（几何 GLB + KTX2 + meta）…')
       const stamp = exportStamp()
-      const result = await exportTerrainPack(this.terrainMesh, stamp)
+      const result = await exportTerrainPack(this.terrainMesh, stamp, ctx)
       const texHint =
         result.textureFormat === 'ktx2'
           ? 'KTX2'
@@ -836,7 +918,7 @@ export class App {
             ? '无贴图'
             : result.textureFormat.toUpperCase()
       this.panel.setStatus(
-        `已下载 ${stamp}_pack.zip（${formatBytes(result.blob.size)} · 网格 ${formatBytes(result.geometryBytes)} · 贴图 ${texHint} ${formatBytes(result.textureBytes)}）`,
+        `已下载 ${stamp}_pack.zip（${formatBytes(result.blob.size)} · 网格 ${formatBytes(result.geometryBytes)} · 贴图 ${texHint} ${formatBytes(result.textureBytes)} · 含 meta）`,
       )
     } catch (err) {
       this.panel.setStatus(
@@ -844,6 +926,97 @@ export class App {
       )
     } finally {
       this.panel.setBusy(false)
+    }
+  }
+
+  private async handleExportViewer(): Promise<void> {
+    if (!this.terrainMesh) {
+      this.panel.setStatus('请先生成地形')
+      return
+    }
+    const ctx = this.getExportContext()
+    if (!ctx) {
+      this.panel.setStatus('缺少选区或高程信息，请重新生成')
+      return
+    }
+    try {
+      this.panel.setBusy(true)
+      this.panel.setStatus('导出可运行项目包（一体 GLB）…')
+      const result = await exportRunnableProject(this.terrainMesh, ctx)
+      this.panel.setStatus(
+        `已下载 terrain_viewer.zip（${formatBytes(result.blob.size)}）· 解压后 npx serve . 预览`,
+      )
+    } catch (err) {
+      this.panel.setStatus(
+        err instanceof Error ? err.message : '可运行项目包导出失败',
+      )
+    } finally {
+      this.panel.setBusy(false)
+    }
+  }
+
+  private handleSaveProject(): void {
+    this.values = this.panel.getValues()
+    const mainBBox = this.mainBBox ?? this.map.getMainBBox()
+    const center = this.map.getMapCenter()
+    const project = createProject({
+      panel: this.values,
+      main: mainBBox
+        ? { bbox: mainBBox, shape: this.map.getMainShape() }
+        : null,
+      patches: this.map.getPatches(),
+      mapView: {
+        lat: center.lat,
+        lng: center.lng,
+        zoom: this.map.getZoom(),
+      },
+    })
+    const stamp = exportStamp()
+    downloadText(projectToJson(project), `${stamp}_project.json`)
+    this.panel.setStatus(`已保存项目 ${stamp}_project.json`)
+  }
+
+  private async handleLoadProject(file: File): Promise<void> {
+    try {
+      const text = await file.text()
+      const project = parseProjectJson(text)
+      this.values = { ...project.panel }
+      setMapboxToken(this.values.mapboxToken)
+      this.panel.setValues(this.values)
+      this.map.setDrawMode(this.values.drawMode)
+      this.map.setShape(this.values.shape)
+      this.map.setPatchZoom(this.values.patchZoom)
+      this.panel.setModeHelp(this.values.drawMode)
+
+      if (project.main) {
+        this.map.setMainBBox(project.main.bbox, project.main.shape)
+        this.mainBBox = this.map.getMainBBox()
+      } else {
+        this.mainBBox = null
+      }
+      this.map.setPatches(project.patches)
+      this.patches = this.map.getPatches()
+      this.map.setView(
+        project.mapView.lat,
+        project.mapView.lng,
+        project.mapView.zoom,
+      )
+      if (project.main) this.map.fitBBox(project.main.bbox)
+
+      this.view.clearTerrain()
+      disposeTerrain(this.terrainMesh)
+      this.terrainMesh = null
+      this.heightGrid = null
+      this.lastBuilt = null
+      this.panel.setExportEnabled(false)
+      this.updateMeta(true)
+      this.panel.setStatus(
+        `已打开项目（${project.savedAt.slice(0, 19).replace('T', ' ')}），请重新生成地形`,
+      )
+    } catch (err) {
+      this.panel.setStatus(
+        err instanceof Error ? err.message : '打开项目失败',
+      )
     }
   }
 

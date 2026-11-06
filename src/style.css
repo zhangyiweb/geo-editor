@@ -189,11 +189,22 @@ input[type='range'] {
   flex: 1;
 }
 
+.project-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.project-row .btn {
+  flex: 1;
+}
+
 .export-dialog {
   border: none;
   padding: 0;
   background: transparent;
-  max-width: min(420px, calc(100vw - 32px));
+  max-width: min(640px, calc(100vw - 28px));
+  width: min(640px, calc(100vw - 28px));
 }
 
 .export-dialog::backdrop {
@@ -251,6 +262,41 @@ input[type='range'] {
 .export-dialog-list {
   display: flex;
   flex-direction: column;
+  gap: 14px;
+}
+
+.export-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.export-group-panel {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  background: rgba(8, 18, 30, 0.72);
+}
+
+.export-group-title {
+  margin: 0;
+  padding: 0;
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: #93c5fd;
+}
+
+.export-group-desc {
+  margin: -2px 0 2px;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.export-option-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
 
@@ -261,28 +307,42 @@ input[type='range'] {
   gap: 4px;
   width: 100%;
   text-align: left;
-  padding: 10px 12px;
+  padding: 11px 12px;
   border-radius: 10px;
   border: 1px solid rgba(56, 189, 248, 0.22);
-  background: rgba(10, 21, 32, 0.9);
+  background: rgba(10, 21, 32, 0.95);
   color: var(--text);
   cursor: pointer;
+  min-height: 76px;
+}
+
+.export-option-primary {
+  padding: 12px 14px;
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(14, 165, 233, 0.12);
+  min-height: auto;
 }
 
 .export-option strong {
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   color: #7dd3fc;
 }
 
 .export-option span {
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   color: var(--muted);
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .export-option:hover {
   border-color: rgba(56, 189, 248, 0.55);
-  background: rgba(14, 165, 233, 0.12);
+  background: rgba(14, 165, 233, 0.14);
+}
+
+@media (max-width: 560px) {
+  .export-option-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .seg {

@@ -93,6 +93,7 @@ export type PreparedExport = {
  */
 export async function prepareExportMesh(source: Mesh): Promise<PreparedExport> {
   const geo = source.geometry.clone()
+  geo.deleteAttribute('elevation')
   compactIndexedGeometry(geo)
 
   const srcMat = source.material as MeshStandardMaterial
