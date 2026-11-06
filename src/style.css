@@ -349,8 +349,9 @@ input[type='range'] {
   border: none;
   padding: 0;
   background: transparent;
-  max-width: min(960px, calc(100vw - 24px));
-  width: min(960px, calc(100vw - 24px));
+  max-width: min(1480px, calc(100vw - 16px));
+  width: min(1480px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
 }
 
 .texture-studio-dialog::backdrop {
@@ -370,9 +371,10 @@ input[type='range'] {
 
 .texture-studio-body {
   display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
-  gap: 12px;
-  min-height: 420px;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 14px;
+  min-height: min(640px, calc(100vh - 160px));
+  height: min(720px, calc(100vh - 140px));
 }
 
 .texture-studio-side {
@@ -389,7 +391,8 @@ input[type='range'] {
 }
 
 .texture-studio-view {
-  min-height: 420px;
+  min-height: 0;
+  height: 100%;
   border-radius: 12px;
   border: 1px solid rgba(56, 189, 248, 0.22);
   background: #070e18;
